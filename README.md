@@ -50,7 +50,7 @@ In the backend directory, create a file named .env and add the following keys. F
 
 ```bash
 
-Code snippet
+
 PORT=5000
 MONGO_URI=your_mongodb_atlas_connection_string
 CLOUDINARY_CLOUD_NAME=your_cloud_name
@@ -137,12 +137,12 @@ For utility apps, it is common to just use a basic HTML form that displays all i
 ### Assumptions
 
 * **Modern Browsers:** A web app might rely on server-side rendering to support legacy environments. But managing complex UI states on the server is inefficient. That is why the frontend is built entirely on React, assuming end-users will access the application using modern, JavaScript-enabled web browsers.
-* **Environment Clocks:** Distributed apps might use logical clocks or client-side time. But for a strict time-based expiry system, using anything other than standard UTC time creates severe vulnerabilities. That is why it is assumed the server running the backend has an accurately synced system clock, as the expiry logic and MongoDB TTL index rely heavily on it.
+* **Environment Clocks:** Distributed apps might use logical clocks or client-side time. But for a strict time-based expiry system, using anything other than standard UTC time creates severe vulnerabilities. That is why it is assumed the server running the backend has an accurately synced system clock, as the expiry logic rely heavily on it.
 * **Scope of Use:** Generally, file-sharing platforms allow massive uploads to accommodate all user needs. But allowing large-scale video or raw data hosting leads to rapid storage exhaustion and high bandwidth costs. That is why the system assumes a `5MB` file limit is sufficient. It is strictly designed for quick document and snippet sharing.
 
 ### Limitations
 
-* **Background Job Sweep Timing:** Distributed apps might use logical clocks or rely on client-side time. But for a strict time-based expiry system, trusting anything other than standard UTC time creates severe vulnerabilities. That is why it is strictly assumed the server running the backend has an accurately synced system clock. The core expiry logic relies heavily on it to enforce precise access control and consistent document deletion
+* **Background Job Sweep Timing:** It is expected that an expired document vanishes the exact millisecond time runs out. But constantly polling the server for exact-millisecond deletions is highly inefficient and drains system resources. That is why the background Cron job is configured to run only once every 60 seconds. As a result, while the API logic strictly denies user access the exact millisecond a link expires (returning a 403 error), the actual physical deletion of the file from Cloudinary and the database might lag by up to a minute.
 * **Third-Party Quotas:** An application might store files locally to avoid third-party restrictions. But storing binary files on the server rapidly consumes disk space and hurts scalability. That is why files are streamed to Cloudinary instead. Because of this, the application is inherently limited by Cloudinary's free-tier API rate limits, bandwidth, and storage quotas.
 * **No Password Recovery:** Normally, systems include recovery flows to help users regain access to their data. But implementing recovery mechanisms requires storing additional metadata and breaks the concept of a secure, ephemeral vault. That is why the system is designed strictly as a "burn-after-reading" vault. If a password or generated URL is lost, there is absolutely no recovery mechanism.
  
@@ -263,4 +263,5 @@ sequenceDiagram
     else Valid Request
         API->>DB: Increment viewCount (+1)
         API-->>U: 200 OK (Return Text Payload or Cloudinary URL)
+
     end
