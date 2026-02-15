@@ -118,19 +118,24 @@ BY REST conventions, fetching data should be a `GET` request. But since I implem
 ### 2. The Background Deletion Job (Cron vs. TTL)
 MongoDB's built-in TTL indexes (expireAfterSeconds: 0) are used for automatic deletion. But because MongoDB's background thread deletes the document silently, the Node.js server is never notified, leaving orphaned binary files on Cloudinary eating up storage quotas. That is why a custom background Cron job using node-cron is implemented. It wakes up every minute, sweeps the database for expired links, securely deletes the file from Cloudinary's servers via API, and then removes the database record, ensuring 100% clean hybrid storage.
 
-### 3. Hybrid Storage (Cloudinary vs. Database)
+### 3. Unified Access Metric 
+
+File-sharing platforms decouple page views and file downloads into separate metrics. But leaving these separate in an ephemeral vault creates a security loophole where users could repeatedly view the file metadata without triggering the destruction sequence. That is why view count and download count are unified into a single, strict access metric. The exact moment a link is successfully unlocked and the payload (text or Cloudinary URL) is delivered to the frontend, the data is considered completely consumed. This zero-tolerance exposure policy ensures the maxViews limit is aggressively enforced, guaranteeing the background Cron job accurately scrubs the data the very first time it is exposed.
+
+### 4. Hybrid Storage (Cloudinary vs. Database)
 
 One might consider storing all uploaded data directly in the database. But since MongoDB uses BSON which has a strict `16MB` document limit, storing binary files directly makes the database bloated and queries extremely slow. That is why I split the storage logic. 
 
 If a user uploads text, it goes straight into `MongoDB`. But if it's a file, I used `multer` to intercept the upload and stream it directly to `Cloudinary`. I only save the resulting secure Cloudinary URL in MongoDB, which keeps the database lightweight and fast
 
-### 4. File Size and Type Validation
+### 5. File Size and Type Validation
 
 By default, an upload endpoint will accept any file sent by the client. But leaving this open means users could upload massive files or malicious scripts, leading to server abuse and rapid storage consumption. That is why I configured the `multer middleware` to strictly reject any file larger than `5MB`. I also added a `fileFilter` to only accept standard, safe file formats `(JPG, PNG, PDF, and TXT)`. This blocks invalid uploads at the middleware level before they can waste server resources or bandwidth.
 
-### 5. Frontend UI/UX Approach
+### 6. Frontend UI/UX Approach
 
 For utility apps, it is common to just use a basic HTML form that displays all input fields at once. But showing both text and file inputs simultaneously clutters the interface, and a basic design doesn't inspire user trust. That is why I used `Tailwind CSS` to build a Glassmorphism UI and implemented conditional rendering. The form dynamically changes based on whether the user selects text sharing or file upload. This keeps the screen clean and easy to understand while making the app feel like a modern, secure SaaS product.
+
 
 
 ## Assumptions & Limitations
@@ -265,3 +270,4 @@ sequenceDiagram
         API-->>U: 200 OK (Return Text Payload or Cloudinary URL)
 
     end
+
